@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bangor WebAR – Environmental Data Overlay</title>
+
+  <!-- A-Frame -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.7.0/dist/aframe.min.js"></script>
+  <!-- AR.js for A-Frame (marker + location) -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+  <!-- AR.js location component -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      overflow: hidden;
+    }
+
+    /* ── Mode selector overlay ── */
+    #mode-screen {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 24px;
+    }
+
+    #mode-screen h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      text-align: center;
+      background: linear-gradient(90deg, #58a6ff, #3fb950);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    #mode-screen p.sub {
+      font-size: 0.85rem;
+      color: #8b949e;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .mode-card {
+      width: 100%;
+      max-width: 340px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+
+    .mode-card:hover {
+      border-color: #58a6ff;
+      transform: translateY(-2px);
+    }
+
+    .mode-card h2 {
+      font-size: 1rem;
+      color: #58a6ff;
+      margin-bottom: 6px;
+    }
+
+    .mode-card p {
+      font-size: 0.8rem;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+
+    /* ── Info panel overlay (tap to expand) ── */
+    #info-panel {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(13,17,23,0.97);
+      border-top: 1px solid #30363d;
+      padding: 20px 24px 32px;
+      z-index: 8000;
+      border-radius: 16px 16px 0 0;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+
+    #info-panel.open {
+      display: block;
+      transform: translateY(0);
+    }
+
+    #info-panel h3 {
+      color: #58a6ff;
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .metric-row:last-child { border-bottom: none; }
+
+    .metric-name { font-size: 0.85rem; color: #8b949e; }
+    .metric-value { font-size: 0.95rem; font-weight: 600; color: #e6edf3; }
+    .metric-bar {
+      width: 100%;
+      height: 4px;
+      background: #21262d;
+      border-radius: 2px;
+      margin-top: 4px;
+    }
+    .metric-bar-fill {
+      height: 4px;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 14px; right: 16px;
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    /* ── HUD ── */
+    #hud {
+      display: none;
+      position: fixed;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13,17,23,0.85);
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 0.75rem;
+      color: #8b949e;
+      z-index: 7000;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #sim-badge {
+      display: none;
+      position: fixed;
+      bottom: 20px; right: 16px;
+      background: rgba(255,165,0,0.15);
+      border: 1px solid #FFA500;
+      color: #FFA500;
+      font-size: 0.7rem;
+      border-radius: 8px;
+      padding: 4px 10px;
+      z-index: 7500;
+    }
+
+    /* GPS location list (location mode) */
+    #location-list {
+      display: none;
+      position: fixed;
+      top: 60px; left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 360px;
+      z-index: 7000;
+    }
+
+    .loc-chip {
+      background: rgba(13,17,23,0.9);
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .loc-chip:hover { border-color: #58a6ff; }
+    .loc-chip-name { font-size: 0.9rem; color: #e6edf3; }
+    .loc-chip-aqi { font-size: 0.75rem; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ MODE SELECTOR ═══════════════════════════════ -->
+<div id="mode-screen">
+  <h1>Bangor Environmental AR</h1>
+  <p class="sub">Handheld WebAR · Environmental Data Overlay<br>
+    <em style="font-size:0.75rem; color:#555">Data shown is simulated for demonstration purposes.</em>
+  </p>
+
+  <div class="mode-card" onclick="startMarkerMode()">
+    <h2>📷 Marker Mode</h2>
+    <p>Point your camera at the printed Hiro marker to reveal environmental data overlaid in AR. Best for accurate indoor/outdoor placement.</p>
+  </div>
+
+  <div class="mode-card" onclick="startLocationMode()">
+    <h2>📍 Location Mode</h2>
+    <p>Select a Bangor landmark to view its environmental readings. Uses GPS coordinates. Best experienced outdoors at the actual location.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ HUD ═══════════════════════════════ -->
+<div id="hud">Searching for marker…</div>
+<div id="sim-badge">⚠ Simulated Data</div>
+
+<!-- ═══════════════════════════════ LOCATION LIST ═══════════════════════════════ -->
+<div id="location-list"></div>
+
+<!-- ═══════════════════════════════ INFO PANEL ═══════════════════════════════ -->
+<div id="info-panel">
+  <button class="close-btn" onclick="closePanel()">✕</button>
+  <h3 id="panel-title">Location</h3>
+  <div id="panel-content"></div>
+</div>
+
+<!-- ═══════════════════════════════ A-FRAME SCENE (MARKER) ═══════════════════════════════ -->
+<a-scene
+  id="ar-scene"
+  style="display:none"
+  embedded
+  arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+  renderer="logarithmicDepthBuffer: true; antialias: true;"
+  vr-mode-ui="enabled: false"
+>
+  <a-assets>
+    <!-- Preload nothing heavy — panels are procedural -->
+  </a-assets>
+
+  <!-- Hiro marker anchor -->
+  <a-marker preset="hiro" id="hiro-marker" smooth="true" smoothCount="10" smoothTolerance="0.01" smoothThreshold="5">
+
+    <!-- ── Background card ── -->
+    <a-plane
+      position="0 0.5 0"
+      rotation="-90 0 0"
+      width="2.8" height="3.4"
+      color="#0d1117"
+      opacity="0.92"
+      material="shader: flat"
+    ></a-plane>
+
+    <!-- ── Location title ── -->
+    <a-text
+      value="BANGOR PIER"
+      position="0 2.3 0.01"
+      rotation="-90 0 0"
+      align="center"
+      color="#58a6ff"
+      width="3"
+      font="roboto"
+    ></a-text>
+
+    <a-text
+      value="Environmental Readings — Simulated"
+      position="0 2.05 0.01"
+      rotation="-90 0 0"
+      align="center"
+      color="#8b949e"
+      width="2.5"
+    ></a-text>
+
+    <!-- ── AQI row ── -->
+    <a-text value="Air Quality (AQI)" position="-1.2 1.75 0.01" rotation="-90 0 0" color="#8b949e" width="2.2" align="left"></a-text>
+    <a-text id="aqi-value" value="65 — Moderate" position="0.6 1.75 0.01" rotation="-90 0 0" color="#FFA500" width="2.2" align="right"></a-text>
+    <a-plane position="0 1.58 0.01" rotation="-90 0 0" width="2.6" height="0.08" color="#21262d" material="shader:flat"></a-plane>
+    <a-plane id="aqi-bar" position="-0.325 1.58 0.015" rotation="-90 0 0" width="1.95" height="0.07" color="#FFA500" material="shader:flat"></a-plane>
+
+    <!-- ── Temperature row ── -->
+    <a-text value="Temperature" position="-1.2 1.38 0.01" rotation="-90 0 0" color="#8b949e" width="2.2" align="left"></a-text>
+    <a-text value="14 °C" position="0.6 1.38 0.01" rotation="-90 0 0" color="#58a6ff" width="2.2" align="right"></a-text>
+    <a-plane position="0 1.21 0.01" rotation="-90 0 0" width="2.6" height="0.08" color="#21262d" material="shader:flat"></a-plane>
+    <a-plane position="-0.65 1.21 0.015" rotation="-90 0 0" width="1.3" height="0.07" color="#58a6ff" material="shader:flat"></a-plane>
+
+    <!-- ── Noise row ── -->
+    <a-text value="Noise Level" position="-1.2 1.01 0.01" rotation="-90 0 0" color="#8b949e" width="2.2" align="left"></a-text>
+    <a-text value="52 dB" position="0.6 1.01 0.01" rotation="-90 0 0" color="#e6edf3" width="2.2" align="right"></a-text>
+    <a-plane position="0 0.84 0.01" rotation="-90 0 0" width="2.6" height="0.08" color="#21262d" material="shader:flat"></a-plane>
+    <a-plane position="-0.325 0.84 0.015" rotation="-90 0 0" width="1.95" height="0.07" color="#3fb950" material="shader:flat"></a-plane>
+
+    <!-- ── Humidity row ── -->
+    <a-text value="Humidity" position="-1.2 0.64 0.01" rotation="-90 0 0" color="#8b949e" width="2.2" align="left"></a-text>
+    <a-text value="81 %" position="0.6 0.64 0.01" rotation="-90 0 0" color="#58a6ff" width="2.2" align="right"></a-text>
+    <a-plane position="0 0.47 0.01" rotation="-90 0 0" width="2.6" height="0.08" color="#21262d" material="shader:flat"></a-plane>
+    <a-plane position="0.065 0.47 0.015" rotation="-90 0 0" width="2.47" height="0.07" color="#58a6ff" material="shader:flat"></a-plane>
+
+    <!-- ── PM2.5 row ── -->
+    <a-text value="PM 2.5" position="-1.2 0.27 0.01" rotation="-90 0 0" color="#8b949e" width="2.2" align="left"></a-text>
+    <a-text value="14 µg/m³" position="0.6 0.27 0.01" rotation="-90 0 0" color="#e6edf3" width="2.2" align="right"></a-text>
+    <a-plane position="0 0.10 0.01" rotation="-90 0 0" width="2.6" height="0.08" color="#21262d" material="shader:flat"></a-plane>
+    <a-plane position="-0.845 0.10 0.015" rotation="-90 0 0" width="0.91" height="0.07" color="#3fb950" material="shader:flat"></a-plane>
+
+    <!-- ── Tap hint ── -->
+    <a-text value="Tap panel for health context ↑" position="0 -0.18 0.01" rotation="-90 0 0" align="center" color="#8b949e" width="2.2"></a-text>
+
+    <!-- Invisible tap surface mapped to the card -->
+    <a-plane
+      position="0 1.1 0.02"
+      rotation="-90 0 0"
+      width="2.8" height="3.0"
+      opacity="0"
+      onclick="openPanel('Bangor Pier', 'pier')"
+    ></a-plane>
+
+  </a-marker>
+
+  <a-entity camera></a-entity>
+</a-scene>
+
+<!-- ═══════════════════════════════ SCRIPTS ═══════════════════════════════ -->
+<script>
+  /* ── Data ── */
+  const DATA = {
+    pier: {
+      name: "Bangor Pier",
+      AQI: 65, AQI_label: "Moderate", AQI_color: "#FFA500",
+      Temperature: 14, Noise: 52, Humidity: 81, PM2_5: 14
+    },
+    uni: {
+      name: "Bangor University Main",
+      AQI: 42, AQI_label: "Good", AQI_color: "#00C853",
+      Temperature: 13, Noise: 38, Humidity: 74, PM2_5: 7
+    },
+    cathedral: {
+      name: "Bangor Cathedral",
+      AQI: 55, AQI_label: "Moderate", AQI_color: "#FFA500",
+      Temperature: 13, Noise: 44, Humidity: 77, PM2_5: 10
+    }
+  };
+
+  const EXPLAIN = {
+    AQI: "Air Quality Index measures how clean the air is. 0–50 is Good, 51–100 is Moderate. Values above 100 may affect sensitive groups.",
+    Temperature: "Outdoor temperature in Celsius. Typical Bangor range: 5–18°C. Affects comfort and air quality dispersion.",
+    Noise: "Ambient noise level in decibels. Below 55 dB is generally considered comfortable for outdoor environments.",
+    Humidity: "Relative humidity %. Bangor's coastal location produces consistently high humidity, typically 70–85%.",
+    PM2_5: "Fine particulate matter (µg/m³). WHO guideline is under 15 µg/m³. Lower values indicate cleaner air."
+  };
+
+  /* ── Mode: Marker ── */
+  function startMarkerMode() {
+    document.getElementById('mode-screen').style.display = 'none';
+    document.getElementById('ar-scene').style.display = 'block';
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('sim-badge').style.display = 'block';
+
+    // Track marker visibility to update HUD
+    const marker = document.getElementById('hiro-marker');
+    marker.addEventListener('markerFound', () => {
+      document.getElementById('hud').textContent = '✓ Marker found — environmental data active';
+    });
+    marker.addEventListener('markerLost', () => {
+      document.getElementById('hud').textContent = 'Searching for marker…';
+    });
+  }
+
+  /* ── Mode: Location ── */
+  function startLocationMode() {
+    document.getElementById('mode-screen').style.display = 'none';
+    document.getElementById('sim-badge').style.display = 'block';
+
+    const list = document.getElementById('location-list');
+    list.style.display = 'block';
+
+    const locations = [
+      { key: 'pier',     label: 'Bangor Pier',           lat: 53.2280, lon: -4.1310 },
+      { key: 'uni',      label: 'Bangor University Main', lat: 53.2308, lon: -4.1325 },
+      { key: 'cathedral',label: 'Bangor Cathedral',       lat: 53.2289, lon: -4.1289 }
+    ];
+
+    list.innerHTML = '<div style="font-size:0.75rem;color:#8b949e;text-align:center;margin-bottom:12px;">Select a landmark to view its environmental data</div>';
+
+    locations.forEach(loc => {
+      const d = DATA[loc.key];
+      const chip = document.createElement('div');
+      chip.className = 'loc-chip';
+      chip.innerHTML = `
+        <div class="loc-chip-name">📍 ${loc.label}</div>
+        <div class="loc-chip-aqi" style="color:${d.AQI_color}">AQI: ${d.AQI} — ${d.AQI_label} &nbsp;|&nbsp; <span style="color:#8b949e">${d.Temperature}°C &nbsp; ${d.Humidity}% RH</span></div>
+      `;
+      chip.onclick = () => openPanel(loc.label, loc.key);
+      list.appendChild(chip);
+    });
+  }
+
+  /* ── Info Panel ── */
+  function openPanel(title, key) {
+    const d = DATA[key];
+    document.getElementById('panel-title').textContent = '📍 ' + title;
+
+    const metrics = [
+      { name: 'Air Quality (AQI)', value: `${d.AQI} — ${d.AQI_label}`, color: d.AQI_color, pct: (d.AQI / 300) * 100, explain: EXPLAIN.AQI },
+      { name: 'Temperature',       value: `${d.Temperature} °C`,       color: '#58a6ff', pct: (d.Temperature / 40) * 100, explain: EXPLAIN.Temperature },
+      { name: 'Noise Level',       value: `${d.Noise} dB`,             color: '#3fb950', pct: (d.Noise / 120) * 100,      explain: EXPLAIN.Noise },
+      { name: 'Humidity',          value: `${d.Humidity} %`,           color: '#58a6ff', pct: d.Humidity,                 explain: EXPLAIN.Humidity },
+      { name: 'PM 2.5',            value: `${d.PM2_5} µg/m³`,          color: '#3fb950', pct: (d.PM2_5 / 75) * 100,       explain: EXPLAIN.PM2_5 }
+    ];
+
+    let html = '';
+    metrics.forEach(m => {
+      html += `
+        <div class="metric-row" style="flex-wrap:wrap;gap:4px;">
+          <span class="metric-name">${m.name}</span>
+          <span class="metric-value" style="color:${m.color}">${m.value}</span>
+          <div class="metric-bar" style="width:100%">
+            <div class="metric-bar-fill" style="width:${Math.min(m.pct,100)}%;background:${m.color}"></div>
+          </div>
+          <p style="font-size:0.75rem;color:#8b949e;margin-top:4px;line-height:1.45;">${m.explain}</p>
+        </div>`;
+    });
+
+    document.getElementById('panel-content').innerHTML = html;
+    const panel = document.getElementById('info-panel');
+    panel.style.display = 'block';
+    requestAnimationFrame(() => panel.classList.add('open'));
+  }
+
+  function closePanel() {
+    const panel = document.getElementById('info-panel');
+    panel.classList.remove('open');
+    setTimeout(() => { panel.style.display = 'none'; }, 300);
+  }
+</script>
+
+</body>
+</html>

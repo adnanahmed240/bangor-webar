@@ -1,0 +1,43 @@
+{
+  "locations": [
+    {
+      "id": "bangor_pier",
+      "name": "Bangor Pier",
+      "lat": 53.2280,
+      "lon": -4.1310,
+      "AQI": 65,
+      "AQI_label": "Moderate",
+      "AQI_color": "#FFA500",
+      "Temperature": 14,
+      "Noise": 52,
+      "Humidity": 81,
+      "PM2_5": 14
+    },
+    {
+      "id": "bangor_university_main",
+      "name": "Bangor University Main",
+      "lat": 53.2308,
+      "lon": -4.1325,
+      "AQI": 42,
+      "AQI_label": "Good",
+      "AQI_color": "#00C853",
+      "Temperature": 13,
+      "Noise": 38,
+      "Humidity": 74,
+      "PM2_5": 7
+    },
+    {
+      "id": "bangor_cathedral",
+      "name": "Bangor Cathedral",
+      "lat": 53.2289,
+      "lon": -4.1289,
+      "AQI": 55,
+      "AQI_label": "Moderate",
+      "AQI_color": "#FFA500",
+      "Temperature": 13,
+      "Noise": 44,
+      "Humidity": 77,
+      "PM2_5": 10
+    }
+  ]
+}
