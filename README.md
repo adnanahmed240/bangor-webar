@@ -5,8 +5,7 @@
 **Stack:** A-Frame v1.7 + AR.js + WebXR Device API
 
 ## Live Demo
-<!-- Replace with your GitHub Pages URL after deployment -->
-https://YOUR-USERNAME.github.io/bangor-webar/
+https://adnanahmed240.github.io/bangor-webar/
 
 ## What it does
 A browser-based WebAR application that superimposes simulated environmental data (AQI, temperature, noise, humidity, PM2.5) over real-world Bangor landmarks. Two modes:
